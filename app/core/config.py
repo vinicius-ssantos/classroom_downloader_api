@@ -61,6 +61,28 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = Field(default="INFO", description="Logging level")
+    log_format: str = Field(
+        default="text",
+        description="Log format: 'text' for development, 'json' for production",
+    )
+    log_redact_fields: list[str] = Field(
+        default_factory=list,
+        description="Additional field names to redact in logs",
+    )
+
+    # Security
+    admin_api_token: str | None = Field(
+        default=None,
+        description="Admin API token for protected endpoints",
+    )
+    backend_cors_origins: list[str] = Field(
+        default_factory=list,
+        description="CORS allowed origins (leave empty for default)",
+    )
+    force_https_redirect: bool | None = Field(
+        default=None,
+        description="Force HTTPS redirect (auto-enabled in production)",
+    )
 
     # yt-dlp Configuration
     ytdlp_format: str = Field(
@@ -76,6 +98,21 @@ class Settings(BaseSettings):
     def download_path(self) -> Path:
         """Get download directory as Path object"""
         return Path(self.download_dir)
+
+    @property
+    def environment(self) -> str:
+        """Determine environment based on debug flag"""
+        return "development" if self.debug else "production"
+
+    @property
+    def allowed_cors_origins(self) -> list[str]:
+        """Get CORS origins with defaults based on environment"""
+        if self.backend_cors_origins:
+            return self.backend_cors_origins
+        # Default: localhost in development, empty in production
+        if self.environment == "development":
+            return ["http://localhost:3000", "http://localhost:8001"]
+        return []
 
 
 @lru_cache()

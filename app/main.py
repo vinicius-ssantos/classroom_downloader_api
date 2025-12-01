@@ -6,12 +6,24 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 
+from app.api.middleware.logging import RequestLoggingMiddleware
 from app.core.config import get_settings
+from app.core.logging import configure_logging, get_logger
 from app.db import close_db, init_db
 from app.workers import get_download_worker
 
 settings = get_settings()
+
+# Configure structured logging
+configure_logging(
+    log_level=settings.log_level,
+    log_format=settings.log_format,
+    log_redact_fields=settings.log_redact_fields,
+)
+
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -20,22 +32,35 @@ async def lifespan(app: FastAPI):
     Lifespan context manager for startup and shutdown events
     """
     # Startup
+    logger.info("app_starting", environment=settings.environment)
+
     # Initialize database
+    logger.info("database_initializing")
     await init_db()
+    logger.info("database_initialized")
 
     # Start background worker
     worker = get_download_worker()
     worker_task = asyncio.create_task(worker.start())
+    logger.info("worker_started")
 
     yield
 
     # Shutdown
+    logger.info("app_shutting_down")
+
     # Stop worker
+    logger.info("worker_stopping")
     await worker.stop()
     worker_task.cancel()
+    logger.info("worker_stopped")
 
     # Close database
+    logger.info("database_closing")
     await close_db()
+    logger.info("database_closed")
+
+    logger.info("app_shutdown_complete")
 
 
 def create_app() -> FastAPI:
@@ -53,13 +78,30 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware
+    # HTTPS redirect in production
+    if settings.force_https_redirect or (
+        settings.force_https_redirect is None
+        and settings.environment == "production"
+    ):
+        app.add_middleware(HTTPSRedirectMiddleware)
+        logger.info("https_redirect_enabled")
+
+    # Request logging middleware
+    app.add_middleware(RequestLoggingMiddleware)
+
+    # CORS middleware - configured by environment
+    cors_origins = settings.allowed_cors_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # TODO: Configure properly for production
+        allow_origins=cors_origins if cors_origins else ["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+    logger.info(
+        "cors_configured",
+        origins=cors_origins if cors_origins else ["*"],
+        environment=settings.environment,
     )
 
     # Register routers
@@ -75,6 +117,7 @@ def create_app() -> FastAPI:
             "message": "Classroom Downloader API",
             "version": settings.app_version,
             "docs": "/docs",
+            "environment": settings.environment,
         }
 
     return app
