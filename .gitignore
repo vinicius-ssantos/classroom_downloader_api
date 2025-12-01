@@ -71,3 +71,5 @@ Thumbs.db
 # Alembic
 /migrations/versions/*.py
 !/migrations/versions/.gitkeep
+!/requests_classrom.txt
+!/requests_drive.txt
