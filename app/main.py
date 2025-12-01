@@ -63,10 +63,10 @@ def create_app() -> FastAPI:
     )
 
     # Register routers
-    from app.api.routers import auth, courses, downloads, health
+    from app.api.routers import courses_simple, downloads, health
     app.include_router(health.router)
-    app.include_router(auth.router)
-    app.include_router(courses.router)
+    # app.include_router(auth.router)  # OAuth2 desabilitado - usando cookies
+    app.include_router(courses_simple.router)
     app.include_router(downloads.router)
 
     @app.get("/")

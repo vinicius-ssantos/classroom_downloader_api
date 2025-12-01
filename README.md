@@ -101,12 +101,14 @@ alembic upgrade head
 ### 5. Run
 
 ```bash
-# API
+# API (com worker integrado)
 uvicorn app.main:app --reload
 
-# Worker (in another terminal)
-python -m app.workers.download_worker
+# Ou usando o script principal
+python -m app.main
 ```
+
+**Nota:** O background worker inicia automaticamente com a API!
 
 ### 6. API Documentation
 
@@ -150,27 +152,27 @@ mypy app/
 ## 📖 API Endpoints
 
 ### Authentication
-- `GET /auth/login` - Inicia fluxo OAuth2
-- `GET /auth/callback` - Callback OAuth2
+- `GET /auth/url` - Obtém URL de autenticação OAuth2
+- `GET /auth/callback?code=...&state=...` - Callback OAuth2
+- `GET /auth/status/{user_id}` - Verifica status das credenciais
 
 ### Courses
-- `GET /courses` - Lista cursos
-- `GET /courses/{course_id}` - Detalhes do curso
-- `GET /courses/{course_id}/coursework` - Lista materiais
+- `GET /courses?user_id={user_id}` - Lista cursos com estatísticas
+- `POST /courses/sync?user_id={user_id}` - Sincroniza cursos do Google Classroom
+- `GET /courses/{course_id}` - Detalhes de um curso
+- `POST /courses/{course_id}/sync-coursework?user_id={user_id}` - Sincroniza materiais e extrai vídeos
+- `GET /courses/{course_id}/coursework` - Lista materiais com vídeos
 
 ### Downloads
-- `POST /downloads` - Enfileira download
-- `GET /downloads/{download_id}` - Status do download
-- `GET /downloads` - Lista downloads
-- `DELETE /downloads/{download_id}` - Cancela download
-
-### Batch
-- `POST /courses/{course_id}/download-all` - Download de curso completo
-- `GET /batch-downloads/{job_id}` - Status do batch
+- `POST /downloads?user_id={user_id}&course_id={course_id}` - Cria jobs de download
+  - Body: `{"video_link_ids": [1, 2, 3]}`
+- `GET /downloads?user_id={user_id}` - Lista jobs de download
+- `GET /downloads/{job_id}` - Detalhes do job com progresso
+- `DELETE /downloads/{job_id}` - Cancela job de download
 
 ### Health
-- `GET /health` - Health check
-- `GET /metrics` - Métricas Prometheus
+- `GET /health` - Health check básico
+- `GET /health/db` - Verifica conexão com banco
 
 ## 🔐 Security
 
